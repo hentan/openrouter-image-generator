@@ -73,3 +73,18 @@ def test_service_reports_remote_image_download_errors():
 
     with pytest.raises(OpenRouterError, match="Не удалось загрузить изображение"):
         service.generate_image("secret", "image/model", "a fox")
+
+
+def test_service_saves_image_bytes_to_selected_path(tmp_path):
+    destination = tmp_path / "generated.png"
+    image = ImageAsset(data=b"png-content", mime_type="image/png")
+
+    saved_path = ImageGeneratorService.save_image(image, destination)
+
+    assert saved_path == destination
+    assert destination.read_bytes() == b"png-content"
+
+
+def test_service_refuses_to_save_image_without_data(tmp_path):
+    with pytest.raises(OpenRouterError, match="Нет данных изображения"):
+        ImageGeneratorService.save_image(ImageAsset(url="https://example.com/image.png"), tmp_path / "image.png")

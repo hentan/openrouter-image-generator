@@ -7,7 +7,7 @@ import os
 import queue
 import threading
 import tkinter as tk
-from tkinter import ttk
+from tkinter import filedialog, ttk
 from typing import Any, Callable
 
 from PIL import Image, ImageTk, UnidentifiedImageError
@@ -27,6 +27,7 @@ class ImageGeneratorWindow:
         self.models: dict[str, str] = {}
         self.completed_tasks: queue.Queue[tuple[ttk.Button, Callable[..., Any], Any, Exception | None]] = queue.Queue()
         self.preview_image: ImageTk.PhotoImage | None = None
+        self.current_image: ImageAsset | None = None
 
         self._build_ui()
         self.root.after(100, self._process_completed_tasks)
@@ -104,6 +105,13 @@ class ImageGeneratorWindow:
             actions, text="Сгенерировать изображение", command=self.generate_image
         )
         self.generate_button.pack(side="left", padx=(8, 0))
+        self.save_button = ttk.Button(
+            actions,
+            text="Сохранить изображение",
+            command=self.save_image,
+            state="disabled",
+        )
+        self.save_button.pack(side="left", padx=(8, 0))
 
         self.status = tk.StringVar(value="Введите API-ключ и загрузите список моделей.")
         self.status_label = ttk.Label(main, textvariable=self.status, wraplength=800)
@@ -241,7 +249,39 @@ class ImageGeneratorWindow:
             self._set_status(f"Не удалось открыть изображение: {error}", error=True)
             return
         self.preview_label.configure(image=self.preview_image, text="")
+        self.current_image = image
+        self.save_button.configure(state="normal")
         self._set_status("Изображение готово.")
+
+    def save_image(self) -> None:
+        if self.current_image is None or self.current_image.data is None:
+            self._set_status("Сначала сгенерируйте изображение.", error=True)
+            return
+
+        extensions = {
+            "image/jpeg": (".jpg", "JPEG"),
+            "image/png": (".png", "PNG"),
+            "image/webp": (".webp", "WebP"),
+            "image/gif": (".gif", "GIF"),
+            "image/bmp": (".bmp", "BMP"),
+        }
+        extension, format_name = extensions.get(self.current_image.mime_type, (".png", "PNG"))
+        destination = filedialog.asksaveasfilename(
+            parent=self.root,
+            title="Сохранить изображение",
+            initialfile=f"generated-image{extension}",
+            defaultextension=extension,
+            filetypes=[(f"{format_name} image", f"*{extension}")],
+        )
+        if not destination:
+            return
+
+        try:
+            saved_path = self.service.save_image(self.current_image, destination)
+        except Exception as error:
+            self._set_status(str(error), error=True)
+            return
+        self._set_status(f"Изображение сохранено: {saved_path}")
 
 
 def main() -> None:

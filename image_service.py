@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Callable
 
 import requests
@@ -39,3 +40,14 @@ class ImageGeneratorService:
             )
         mime_type = response.headers.get("Content-Type", image.mime_type).split(";", 1)[0]
         return ImageAsset(data=response.content, mime_type=mime_type)
+
+    @staticmethod
+    def save_image(image: ImageAsset, destination: str | Path) -> Path:
+        if image.data is None:
+            raise OpenRouterError("Нет данных изображения для сохранения.")
+        path = Path(destination)
+        try:
+            path.write_bytes(image.data)
+        except OSError as error:
+            raise OpenRouterError(f"Не удалось сохранить изображение: {error}") from error
+        return path
